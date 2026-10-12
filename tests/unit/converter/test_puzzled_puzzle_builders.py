@@ -201,3 +201,18 @@ def test_word_search_hides_the_word_without_expanding_it():
     grid = _parse_grid(build_word_search(["straße", "tasse"], random.Random(42)))
     assert _find_word(grid, "STRAßE")
     assert _find_word(grid, "TASSE")
+
+
+def test_anagram_preserves_distinct_case_folded_words() -> None:
+    sequence = build_anagram(["ılık", "ilik"], random.Random(42))
+    assert sorted(sequence) == sorted("ıLıKILIK")
+
+
+def test_crossword_preserves_distinct_case_folded_words() -> None:
+    assert build_crossword(["ılık", "ilik"]) == "1. ı*ı#\n2. I*I#"
+
+
+def test_word_search_preserves_distinct_case_folded_words() -> None:
+    grid = _parse_grid(build_word_search(["ılık", "ilik"], random.Random(42)))
+    assert _find_word(grid, "ıLıK")
+    assert _find_word(grid, "ILIK")

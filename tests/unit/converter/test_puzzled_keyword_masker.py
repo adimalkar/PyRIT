@@ -264,6 +264,23 @@ def test_mask_prompt_masks_whole_words_next_to_text_with_combining_marks():
 
 
 @_no_spacy
+@pytest.mark.parametrize("joiner", ["\u200c", "\u200d"])
+@pytest.mark.parametrize("template", ["अक्{joiner}षर", "école{joiner}ami"])
+def test_mask_prompt_rejects_fragments_adjoining_joiners(*, joiner: str, template: str) -> None:
+    with pytest.raises(ValueError, match="no maskable words"):
+        mask_prompt(template.format(joiner=joiner))
+
+
+@_no_spacy
+@pytest.mark.parametrize("joiner", ["\u200c", "\u200d"])
+def test_mask_prompt_preserves_joined_words_beside_maskable_words(joiner: str) -> None:
+    joined_word = f"अक्{joiner}षर"
+    result = mask_prompt(f"garden {joined_word} now", num_to_mask=3)
+    assert [word.text for word in result.masked_words] == ["garden", "now"]
+    assert result.masked_prompt == f"[WORD1] {joined_word} [WORD2]"
+
+
+@_no_spacy
 @pytest.mark.parametrize("prompt", ["abc²", "² ¼", "x¼ y³"])
 def test_mask_prompt_never_selects_tokens_with_non_decimal_numbers(prompt):
     # "²" and "¼" are word characters but not decimal digits, so [^\W\d_] admits them; a token

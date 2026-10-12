@@ -32,8 +32,8 @@ logger = logging.getLogger(__name__)
 _WORD_PATTERN = re.compile(r"\b[^\W\d_]+\b")
 
 
-def _is_combining_mark(char: str) -> bool:
-    return unicodedata.category(char).startswith("M")
+def _is_word_continuation(char: str) -> bool:
+    return char in ("\u200c", "\u200d") or unicodedata.category(char).startswith("M")
 
 
 def _word_key(word: str) -> str:
@@ -62,9 +62,9 @@ def _iter_words(prompt: str) -> Iterator[re.Match[str]]:
     therefore rejected whole, like "h4ck3r", rather than becoming a candidate.
 
     ``\\w`` does not cover combining marks (Devanagari vowel signs, Hebrew and Arabic vowel
-    points, or the accents of NFD-decomposed text), so ``\\b`` falls inside words that
-    contain them. A match that touches a combining mark is only a fragment of a word, so it
-    is skipped as well.
+    points, or the accents of NFD-decomposed text) or zero-width joiners and non-joiners.
+    These characters can continue a word even though ``\\b`` treats them as boundaries.
+    A match that touches one of them is only a fragment, so it is skipped as well.
 
     Args:
         prompt (str): The prompt to scan.
@@ -76,9 +76,9 @@ def _iter_words(prompt: str) -> Iterator[re.Match[str]]:
         if not match.group().isalpha():
             continue
         start, end = match.span()
-        if start > 0 and _is_combining_mark(prompt[start - 1]):
+        if start > 0 and _is_word_continuation(prompt[start - 1]):
             continue
-        if end < len(prompt) and _is_combining_mark(prompt[end]):
+        if end < len(prompt) and _is_word_continuation(prompt[end]):
             continue
         yield match
 
@@ -350,8 +350,8 @@ def mask_prompt(
 
     # Replace the word spans of the same scan, looked up by the same key. Every occurrence of
     # a chosen word is masked whatever its casing, a fragment the scan skipped (next to a
-    # combining mark) is never masked, and every replaced span has a placeholder. Building the
-    # result in one pass also means an inserted placeholder can never be matched again.
+    # combining mark or joiner) is never masked, and every replaced span has a placeholder.
+    # Building the result in one pass means an inserted placeholder can never be matched again.
     pieces: list[str] = []
     last_end = 0
     for match in _iter_words(prompt):

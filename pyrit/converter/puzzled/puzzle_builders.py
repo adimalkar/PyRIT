@@ -58,27 +58,29 @@ class PuzzleType(str, Enum):
 
 def _upper_same_length(word: str) -> str:
     """
-    Uppercase ``word`` one character at a time, without changing its length.
+    Uppercase ``word`` without changing its length or case-folded spelling.
 
     ``str.upper`` expands some letters ("ß" becomes "SS", "ﬁ" becomes "FI"), which would make
-    an encoded word longer than the "N-letter" clue the masker gives for it. A letter whose
-    uppercase form is more than one character is kept as it is.
+    an encoded word longer than its clue. It also changes the case-folded spelling of dotless
+    "ı" to "i", merging distinct words. Keep a character unchanged when either would happen.
 
     Args:
         word (str): The word to uppercase.
 
     Returns:
-        str: The uppercased word, with the same number of characters as ``word``.
+        str: The uppercased word, preserving its length and case-folded spelling.
     """
-    return "".join(upper if len(upper := char.upper()) == 1 else char for char in word)
+    return "".join(
+        upper if len(upper := char.upper()) == 1 and upper.casefold() == char.casefold() else char for char in word
+    )
 
 
 def _normalize(words: list[str]) -> list[str]:
     """
     Uppercase the words and strip surrounding whitespace.
 
-    Uppercasing keeps each word's length (see ``_upper_same_length``), so every puzzle
-    encodes exactly as many letters as the masked word's length clue states.
+    Uppercasing keeps each word's length and case-folded spelling (see ``_upper_same_length``),
+    so every puzzle agrees with both the masker's length clue and its word identity.
 
     Args:
         words (list[str]): The masked keywords to encode.

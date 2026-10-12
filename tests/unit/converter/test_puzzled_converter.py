@@ -234,6 +234,43 @@ async def test_unicode_case_variants_convert_for_every_puzzle_type(puzzle_type, 
     assert _section(result.output_text, "Instruction with hidden words:", "The hidden words are") == instruction
 
 
+@pytest.mark.parametrize("puzzle_type", ["word_search", "anagram", "crossword"])
+@pytest.mark.parametrize("joiner", ["\u200c", "\u200d"])
+async def test_joined_words_are_never_partially_masked_async(*, puzzle_type: str, joiner: str) -> None:
+    joined_word = f"अक्{joiner}षर"
+    converter = PuzzledConverter(puzzle_type=puzzle_type, num_to_mask=3, seed=42)
+    with pytest.raises(ValueError, match="no maskable words"):
+        await converter.convert_async(prompt=joined_word)
+
+    result = await converter.convert_async(prompt=f"garden {joined_word} now")
+    instruction = _section(result.output_text, "Instruction with hidden words:", "The hidden words are")
+    assert instruction == f"[WORD1] {joined_word} [WORD2]"
+    assert _clue_lengths(result.output_text) == [6, 3]
+
+
+@pytest.mark.parametrize("puzzle_type", ["word_search", "anagram", "crossword"])
+@pytest.mark.parametrize("words", [("ılık", "ilik"), ("ilik", "ılık")])
+async def test_puzzles_preserve_distinct_case_folded_words_async(*, puzzle_type: str, words: tuple[str, str]) -> None:
+    result = await PuzzledConverter(puzzle_type=puzzle_type, num_to_mask=2, seed=42).convert_async(
+        prompt=" ".join(words)
+    )
+    instruction = _section(result.output_text, "Instruction with hidden words:", "The hidden words are")
+    assert instruction == "[WORD1] [WORD2]"
+    assert _clue_lengths(result.output_text) == [4, 4]
+    puzzle = _section(result.output_text, "Puzzle:", "Clues")
+    if puzzle_type == "word_search":
+        grid = [row.split(" ") for row in puzzle.splitlines()]
+        assert _grid_contains(grid, "ıLıK")
+        assert _grid_contains(grid, "ILIK")
+    elif puzzle_type == "anagram":
+        assert sorted(puzzle) == sorted("ıLıKILIK")
+    else:
+        encoded_words = [line.split(". ", 1)[1] for line in puzzle.splitlines()]
+        assert encoded_words[0] != encoded_words[1]
+        for word, encoded in zip(words, encoded_words, strict=True):
+            assert ("ı" in encoded) == ("ı" in word)
+
+
 # --- optional LLM semantic clues -------------------------------------------
 
 
